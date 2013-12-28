@@ -1,7 +1,8 @@
 Kivy Android Camera
 ===================
 
-Author: Mathieu Virbel <mat@meltingrocks.com> (https://github.com/tito/android-zbar-qrcode)
+Author: Mathieu Virbel <mat@meltingrocks.com> 
+
 Modified by Davide Depau
 
 Featuring:
