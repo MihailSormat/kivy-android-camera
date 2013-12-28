@@ -33,14 +33,10 @@ System = autoclass('java.lang.System')
 System.loadLibrary('iconv')
 PythonActivity = autoclass('org.renpy.android.PythonActivity')
 Camera = autoclass('android.hardware.Camera')
-ImageScanner = autoclass('net.sourceforge.zbar.ImageScanner')
-Config = autoclass('net.sourceforge.zbar.Config')
 SurfaceView = autoclass('android.view.SurfaceView')
 LayoutParams = autoclass('android.view.ViewGroup$LayoutParams')
-Image = autoclass('net.sourceforge.zbar.Image')
 ImageFormat = autoclass('android.graphics.ImageFormat')
 LinearLayout = autoclass('android.widget.LinearLayout')
-Symbol = autoclass('net.sourceforge.zbar.Symbol')
 
 
 class PreviewCallback(PythonJavaClass):
@@ -217,35 +213,15 @@ class AndroidCamera(Widget):
         if self._holder:
             self._holder.pos = pos
 
-
-class ZbarQrcodeDetector(AnchorLayout):
-    '''Widget that use the AndroidCamera and zbar to detect qrcode.
-    When found, the `symbols` will be updated
-    '''
+class CameraWidget(AnchorLayout):
     camera_size = ListProperty([320, 240])
 
-    symbols = ListProperty([])
-
-    # XXX can't work now, due to overlay.
-    show_bounds = BooleanProperty(False)
-
-    Qrcode = namedtuple('Qrcode',
-            ['type', 'data', 'bounds', 'quality', 'count'])
-
     def __init__(self, **kwargs):
-        super(ZbarQrcodeDetector, self).__init__(**kwargs)
+        super(CameraWidget, self).__init__(**kwargs)
         self._camera = AndroidCamera(
                 size=self.camera_size,
                 size_hint=(None, None))
-        self._camera.bind(on_preview_frame=self._detect_qrcode_frame)
         self.add_widget(self._camera)
-
-        # create a scanner used for detecting qrcode
-        self._scanner = ImageScanner()
-        self._scanner.setConfig(0, Config.ENABLE, 0)
-        self._scanner.setConfig(Symbol.QRCODE, Config.ENABLE, 1)
-        self._scanner.setConfig(0, Config.X_DENSITY, 3)
-        self._scanner.setConfig(0, Config.Y_DENSITY, 3)
 
     def start(self):
         self._camera.start()
@@ -253,85 +229,29 @@ class ZbarQrcodeDetector(AnchorLayout):
     def stop(self):
         self._camera.stop()
 
-    def _detect_qrcode_frame(self, instance, camera, data):
-        # the image we got by default from a camera is using the NV21 format
-        # zbar only allow Y800/GREY image, so we first need to convert,
-        # then start the detection on the image
-        parameters = camera.getParameters()
-        size = parameters.getPreviewSize()
-        barcode = Image(size.width, size.height, 'NV21')
-        barcode.setData(data)
-        barcode = barcode.convert('Y800')
-
-        result = self._scanner.scanImage(barcode)
-
-        if result == 0:
-            self.symbols = []
-            return
-
-        # we detected qrcode! extract and dispatch them
-        symbols = []
-        it = barcode.getSymbols().iterator()
-        while it.hasNext():
-            symbol = it.next()
-            qrcode = ZbarQrcodeDetector.Qrcode(
-                type=symbol.getType(),
-                data=symbol.getData(),
-                quality=symbol.getQuality(),
-                count=symbol.getCount(),
-                bounds=symbol.getBounds())
-            symbols.append(qrcode)
-
-        self.symbols = symbols
-
-    '''
-    # can't work, due to the overlay.
-    def on_symbols(self, instance, value):
-        if self.show_bounds:
-            self.update_bounds()
-
-    def update_bounds(self):
-        self.canvas.after.remove_group('bounds')
-        if not self.symbols:
-            return
-        with self.canvas.after:
-            Color(1, 0, 0, group='bounds')
-            for symbol in self.symbols:
-                x, y, w, h = symbol.bounds
-                x = self._camera.right - x - w
-                y = self._camera.top - y - h
-                Line(rectangle=[x, y, w, h], group='bounds')
-    '''
-
 
 if __name__ == '__main__':
-
-    qrcode_kv = '''
+    camera_kv = '''
 BoxLayout:
     orientation: 'vertical'
 
-    ZbarQrcodeDetector:
-        id: detector
-
-    Label:
-        text: '\\n'.join(map(repr, detector.symbols))
-        size_hint_y: None
-        height: '100dp'
+    CameraWidget:
+        id: camera
 
     BoxLayout:
         size_hint_y: None
         height: '48dp'
 
         Button:
-            text: 'Scan a qrcode'
-            on_release: detector.start()
+            text: 'Start camera'
+            on_release: camera.start()
         Button:
-            text: 'Stop detection'
-            on_release: detector.stop()
+            text: 'Stop camera'
+            on_release: camera.stop()
 '''
 
-    class QrcodeExample(App):
+    class CameraApp(App):
         def build(self):
-            return Builder.load_string(qrcode_kv)
+            return Builder.load_string(camera_kv)
 
-    QrcodeExample().run()
+    CameraApp().run()
